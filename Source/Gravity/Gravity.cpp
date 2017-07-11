@@ -307,7 +307,8 @@ Gravity::solve_for_new_phi (int               level,
                             MultiFab&         phi,
                             const Array<MultiFab*>& grad_phi,
                             int               fill_interior,
-                            int               grav_n_grow)
+                            int               grav_n_grow, 
+                            int               ghost_ngrow)
 {
     BL_PROFILE("Gravity::solve_for_new_phi()");
 #ifdef CGRAV
@@ -332,7 +333,7 @@ Gravity::solve_for_new_phi (int               level,
 
     AddParticlesToRhs(level,Rhs,grav_n_grow);
     AddVirtualParticlesToRhs(level,Rhs,grav_n_grow);
-    AddGhostParticlesToRhs(level,Rhs);
+    AddGhostParticlesToRhs(level,Rhs,ghost_ngrow);
 
     const Real time = LevelData[level]->get_state_data(PhiGrav_Type).curTime();
     solve_for_phi(level, Rhs, phi, grad_phi, time, fill_interior);
@@ -847,7 +848,8 @@ Gravity::get_crse_grad_phi (int               level,
 void
 Gravity::multilevel_solve_for_new_phi (int level,
                                        int finest_level,
-                                       int use_previous_phi_as_guess)
+                                       int use_previous_phi_as_guess,
+                                       int ghost_ngrow)
 {
     BL_PROFILE("Gravity::multilevel_solve_for_new_phi()");
     if (verbose && ParallelDescriptor::IOProcessor())
@@ -867,13 +869,14 @@ Gravity::multilevel_solve_for_new_phi (int level,
     int is_new = 1;
     actual_multilevel_solve(level, finest_level, 
 			    amrex::GetArrOfArrOfPtrs(grad_phi_curr),
-                            is_new, use_previous_phi_as_guess);
+                            is_new, use_previous_phi_as_guess, ghost_ngrow);
 }
 
 void
 Gravity::multilevel_solve_for_old_phi (int level,
                                        int finest_level,
-                                       int use_previous_phi_as_guess)
+                                       int use_previous_phi_as_guess,
+                                       int ghost_ngrow)
 {
     BL_PROFILE("Gravity::multilevel_solve_for_old_phi()");
     if (verbose && ParallelDescriptor::IOProcessor())
@@ -893,14 +896,14 @@ Gravity::multilevel_solve_for_old_phi (int level,
     int is_new = 0;
     actual_multilevel_solve(level, finest_level,
 			    amrex::GetArrOfArrOfPtrs(grad_phi_prev),
-                            is_new, use_previous_phi_as_guess);
+                            is_new, use_previous_phi_as_guess, ghost_ngrow);
 }
 
 void
 Gravity::multilevel_solve_for_phi(int level, int finest_level,
-                                  int use_previous_phi_as_guess)
+                                  int use_previous_phi_as_guess, int ghost_ngrow)
 {
-    multilevel_solve_for_new_phi(level, finest_level, use_previous_phi_as_guess);
+    multilevel_solve_for_new_phi(level, finest_level, use_previous_phi_as_guess, ghost_ngrow);
 }
 
 void
@@ -908,7 +911,8 @@ Gravity::actual_multilevel_solve (int                       level,
                                   int                       finest_level,
                                   const Array<Array<MultiFab*> >& grad_phi,
                                   int                       is_new,
-                                  int                       use_previous_phi_as_guess)
+                                  int                       use_previous_phi_as_guess, 
+                                  int                       ghost_ngrow)
 {
     BL_PROFILE("Gravity::actual_multilevel_solve()");
     const int IOProc = ParallelDescriptor::IOProcessorNumber();
@@ -967,13 +971,14 @@ Gravity::actual_multilevel_solve (int                       level,
     Array<std::unique_ptr<MultiFab> > Rhs_particles(num_levels);
     for (int lev = 0; lev < num_levels; lev++)
     {
-	Rhs_particles[lev].reset(new MultiFab(grids[level+lev], dmap[level+lev], 1, 0));
-       Rhs_particles[lev]->setVal(0.);
+        Rhs_particles[lev].reset(new MultiFab(grids[level+lev],
+                                              dmap[level+lev], 1, 0));
+        Rhs_particles[lev]->setVal(0.);
     }
 
     const auto& rpp = amrex::GetArrOfPtrs(Rhs_particles);
     AddParticlesToRhs(level,finest_level,rpp);
-    AddGhostParticlesToRhs(level,rpp);
+    AddGhostParticlesToRhs(level,rpp, ghost_ngrow);
     AddVirtualParticlesToRhs(finest_level,rpp);
 
     Nyx* cs = dynamic_cast<Nyx*>(&parent->getLevel(level));
@@ -1849,13 +1854,14 @@ Gravity::AddVirtualParticlesToRhs(int finest_level, const Array<MultiFab*>& Rhs_
 
 void
 Gravity::AddGhostParticlesToRhs (int               level,
-                                 MultiFab&         Rhs)
+                                 MultiFab&         Rhs, 
+                                 int               ngrow)
 {
     BL_PROFILE("Gravity::AddGhostParticlesToRhs()");
     if (level > 0)
     {
         // If we have ghost particles, add their density to the single level solve
-        MultiFab ghost_mf(grids[level], dmap[level], 1, 1);
+        MultiFab ghost_mf(grids[level], dmap[level], 1, ngrow);
 
         for (int i = 0; i < Nyx::theGhostParticles().size(); i++)
         {
@@ -1867,15 +1873,17 @@ Gravity::AddGhostParticlesToRhs (int               level,
 }
 
 void
-Gravity::AddGhostParticlesToRhs(int level, const Array<MultiFab*>& Rhs_particles)
+Gravity::AddGhostParticlesToRhs(int level, 
+                                const Array<MultiFab*>& Rhs_particles,
+                                int ngrow)
 {
     BL_PROFILE("Gravity::AddGhostParticlesToRhsML()");
     if (level > 0)
     {
-        // We require one ghost cell in GhostPartMF because that's how we handle
+        // We require ngrow ghost cells in GhostPartMF because that's how we handle
         // particles near fine-fine boundaries.  However we don't add any ghost
         // cells from GhostPartMF to the RHS.
-        MultiFab GhostPartMF(grids[level], dmap[level], 1, 1);
+        MultiFab GhostPartMF(grids[level], dmap[level], 1, ngrow);
         GhostPartMF.setVal(0.0);
 
         // Get the Ghost particle mass function. Note that Ghost particles should

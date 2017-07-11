@@ -62,7 +62,7 @@ public:
     void solve_for_old_phi(int level, amrex::MultiFab& phi, const amrex::Array<amrex::MultiFab*>& grad_phi,
                            int fill_interior);
     void solve_for_new_phi(int level, amrex::MultiFab& phi, const amrex::Array<amrex::MultiFab*>& grad_phi,
-                           int fill_interior, int grav_n_grow = 1);
+                           int fill_interior, int grav_n_grow=1, int ghost_ngrow=1);
     void solve_for_phi(int level, amrex::MultiFab& Rhs, amrex::MultiFab& phi,
                        const amrex::Array<amrex::MultiFab*>& grad_phi, amrex::Real time,
                        int fill_interior);
@@ -75,14 +75,15 @@ public:
                       const amrex::Array<amrex::MultiFab*>& grad_delta_phi_cc);
 
     void multilevel_solve_for_old_phi(int level, int finest_level,
-                                      int use_previous_phi_as_guess=0);
+                                      int use_previous_phi_as_guess=0, int ghost_ngrow=1);
     void multilevel_solve_for_new_phi(int level, int finest_level,
-                                      int use_previous_phi_as_guess=0);
+                                      int use_previous_phi_as_guess=0, int ghost_ngrow=1);
     void multilevel_solve_for_phi(int level, int finest_level,
-                                  int use_previous_phi_as_guess=0);
+                                  int use_previous_phi_as_guess=0, int ghost_ngrow=1);
     void actual_multilevel_solve(int level, int finest_level,
                                  const amrex::Array<amrex::Array<amrex::MultiFab*> >& grad_phi, int is_new,
-                                 int use_previous_phi_as_guess=0);
+                                 int use_previous_phi_as_guess=0, 
+                                 int ghost_ngrow=1);
 
     void get_crse_grad_phi(int level, amrex::Array<std::unique_ptr<amrex::MultiFab> >& grad_phi_crse,
                            amrex::Real time);
@@ -165,11 +166,11 @@ protected:
                       const amrex::Array<amrex::MultiFab*>& ecC) const;
 
     void AddParticlesToRhs(int level, amrex::MultiFab& Rhs, int ngrow);
-    void AddGhostParticlesToRhs(int level, amrex::MultiFab& Rhs);
+    void AddGhostParticlesToRhs(int level, amrex::MultiFab& Rhs, int ngrow);
     void AddVirtualParticlesToRhs(int level, amrex::MultiFab& Rhs, int ngrow);
 
     void AddParticlesToRhs(int base_level, int finest_level, const amrex::Array<amrex::MultiFab*>& Rhs_particles);
-    void AddGhostParticlesToRhs(int level, const amrex::Array<amrex::MultiFab*>& Rhs_particles);
+    void AddGhostParticlesToRhs(int level, const amrex::Array<amrex::MultiFab*>& Rhs_particles, int ngrow);
     void AddVirtualParticlesToRhs(int finest_level, const amrex::Array<amrex::MultiFab*>& Rhs_particles);
 
     void CorrectRhsUsingOffset(int level, amrex::MultiFab& Rhs);

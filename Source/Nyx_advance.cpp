@@ -118,6 +118,14 @@ Nyx::advance_hydro_plus_particles (Real time,
     int grav_n_grow = ghost_width + (1-iteration) +
                       stencil_interpolation_width ;
 
+    // *** tmp_src_width ***  is used
+    //   *) to set how many ghost cells are needed in the temporary MultiFabs that we 
+    //      define inside AssignDensitySingleLevel.   This needs to be big enough
+    //      to hold the contribution from all the particles within ghost_width so that 
+    //      we don't have to test on whether the particles are trying to write out of bounds
+
+    int deposition_width = ghost_width + stencil_deposition_width;
+
     BL_PROFILE_REGION_START("R::Nyx::advance_hydro_plus_particles");
     BL_PROFILE("Nyx::advance_hydro_plus_particles()");
     // Sanity checks
@@ -233,7 +241,8 @@ Nyx::advance_hydro_plus_particles (Real time,
         //
         int use_previous_phi_as_guess = 1;
         gravity->multilevel_solve_for_old_phi(level, finest_level,
-                                              use_previous_phi_as_guess);
+                                              use_previous_phi_as_guess,
+                                              deposition_width);
     }
     BL_PROFILE_VAR_STOP(solve_for_old_phi);
     //
@@ -322,14 +331,14 @@ Nyx::advance_hydro_plus_particles (Real time,
     if (finest_level_to_advance > level)
     {
         gravity->multilevel_solve_for_new_phi(level, finest_level_to_advance, 
-                                              use_previous_phi_as_guess);
+                                              use_previous_phi_as_guess, deposition_width);
     }
     else
     {
         int fill_interior = 0;
         gravity->solve_for_new_phi(level,get_new_data(PhiGrav_Type),
-                               gravity->get_grad_phi_curr(level),
-                               fill_interior, grav_n_grow);
+                                   gravity->get_grad_phi_curr(level),
+                                   fill_interior, grav_n_grow, deposition_width);
     }
     BL_PROFILE_VAR_STOP(solve_for_new_phi);
 
