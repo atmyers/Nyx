@@ -419,8 +419,6 @@ public:
 
     amrex::Real advance_particles_only (amrex::Real time, amrex::Real dt, int iteration, int ncycle);
 
-    void moveKickDriftExact(amrex::Real dt);
-    void moveKickExact(amrex::Real dt);
     void time_center_source_terms(amrex::MultiFab& S_new, amrex::MultiFab& ext_src_old,
                                   amrex::MultiFab& ext_src_new, amrex::Real dt);
 
